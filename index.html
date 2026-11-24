@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Classificador de gato ou cachorro</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f3f6fa;
+      font-family: Arial, sans-serif;
+      color: #1f2937;
+    }
+    main {
+      width: min(520px, calc(100% - 32px));
+      padding: 28px;
+      border-radius: 16px;
+      background: white;
+      box-shadow: 0 10px 30px rgba(31, 41, 55, 0.12);
+      text-align: center;
+    }
+    h1 { margin-top: 0; font-size: 24px; }
+    #preview {
+      display: none;
+      width: 100%;
+      max-height: 360px;
+      object-fit: contain;
+      margin: 16px 0;
+      border-radius: 10px;
+      background: #eef1f5;
+    }
+    input[type="file"] { width: 100%; margin: 8px 0 16px; }
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 8px;
+      padding: 12px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:disabled { background: #94a3b8; cursor: wait; }
+    #resultado {
+      min-height: 24px;
+      margin: 18px 0 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .erro { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Gato ou cachorro?</h1>
+
+    <input id="imagem" type="file" accept="image/*">
+    <img id="preview" alt="Preview da imagem selecionada">
+
+    <button id="classificar" type="button" disabled>Classificar imagem</button>
+    <p id="resultado" aria-live="polite"></p>
+  </main>
+
+  <script>
+    const entrada = document.getElementById("imagem");
+    const preview = document.getElementById("preview");
+    const botao = document.getElementById("classificar");
+    const resultado = document.getElementById("resultado");
+
+    entrada.addEventListener("change", () => {
+      const arquivo = entrada.files[0];
+      resultado.textContent = "";
+      resultado.className = "";
+
+      if (!arquivo) {
+        preview.removeAttribute("src");
+        preview.style.display = "none";
+        botao.disabled = true;
+        return;
+      }
+
+      preview.src = URL.createObjectURL(arquivo);
+      preview.style.display = "block";
+      botao.disabled = false;
+    });
+
+    botao.addEventListener("click", async () => {
+      const arquivo = entrada.files[0];
+      if (!arquivo) return;
+
+      botao.disabled = true;
+      resultado.className = "";
+      resultado.textContent = "Analisando...";
+
+      const dados = new FormData();
+      dados.append("file", arquivo);
+
+      try {
+        const resposta = await fetch("/predict", {
+          method: "POST",
+          body: dados
+        });
+        const dadosResposta = await resposta.json();
+
+        if (!resposta.ok) {
+          throw new Error(dadosResposta.detail || "Erro ao classificar a imagem.");
+        }
+
+        const probabilidade = dadosResposta.prediction === "dog"
+          ? dadosResposta.probability
+          : 1 - dadosResposta.probability;
+
+        resultado.textContent =
+          `A foto é de um ${dadosResposta.prediction === "dog" ? "cachorro" : "gato"} ` +
+          `com ${Math.round(probabilidade * 100)}% de confiança.`;
+      } catch (erro) {
+        resultado.className = "erro";
+        resultado.textContent = erro.message;
+      } finally {
+        botao.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

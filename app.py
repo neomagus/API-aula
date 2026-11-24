@@ -1,31 +1,47 @@
-from fastapi import FastAPI, UploadFile, File
-import tensorflow as tf
-from PIL import Image
 import numpy as np
+from PIL import Image
+import tensorflow as tf
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
 
+app = FastAPI(docs_url="/docs")
 
-app = FastAPI(docs_url="/", title="API de Teste", description="API de Teste para estudo do FastAPI", version="1.0.0")
-
+MODEL_PATH = "model_transfer.keras"
 IMG_SIZE = 224
 
-#Carregar o modelo treinado
-model = tf.keras.models.load_model("model_transfer.keras")
+# Carrega modelo uma vez só ao iniciar o servidor
+model = tf.keras.models.load_model(MODEL_PATH)
 
-@app.get("/health", tags=["Health"])
-async def health_check():
-    return {"status": "ok"}
 
-@app.post("/predict", tags=["Prediction"])
+@app.get("/", include_in_schema=False)
+async def interface():
+    return FileResponse("index.html")
+
+
+@app.get("/health_check")
+async def root():
+    return {"message": "Hello World"}
+
+
+@app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    # Ler a imagem enviada pelo usuário
-    image = image.open(file.file).convert("RGB")
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Envie um arquivo de imagem.")
+
+    try:
+        image = Image.open(file.file).convert("RGB")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Nao foi possivel ler a imagem.")
+
     image = np.array(image)
-    # Pre-processar a imagem para o tamanho esperado pelo modelo
+
+    # Preprocess
     x = tf.convert_to_tensor(image, dtype=tf.float32)
     x = tf.image.resize(x, (IMG_SIZE, IMG_SIZE))
     x = tf.keras.applications.resnet50.preprocess_input(x)
     x = tf.expand_dims(x, axis=0)
-    #Inferir a imagem usando o modelo carregado
+
+    # Inferência
     y = model.predict(x, verbose=0)
 
     prob = float(y[0][0])
