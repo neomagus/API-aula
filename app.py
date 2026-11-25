@@ -35,7 +35,7 @@ async def predict(file: UploadFile = File(...)):
 
     image = np.array(image)
 
-    # Preprocess
+    # Preprocessamento da imagem
     x = tf.convert_to_tensor(image, dtype=tf.float32)
     x = tf.image.resize(x, (IMG_SIZE, IMG_SIZE))
     x = tf.keras.applications.resnet50.preprocess_input(x)
